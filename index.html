@@ -33,12 +33,12 @@
   .copy-btn:hover{background:#d4ff45;}
   .copy-btn.done{background:#4ade80;}
   .hint{font-size:0.62rem;color:#3a3a3a;text-align:center;max-width:560px;line-height:1.6;}
-  .badge-new{display:inline-block;background:#c6f135;color:#0c0c0c;font-size:0.55rem;font-weight:700;padding:2px 6px;border-radius:3px;letter-spacing:0.1em;margin-left:6px;vertical-align:middle;}
+  .version-tag{display:inline-block;background:#c6f135;color:#0c0c0c;font-size:0.55rem;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;vertical-align:middle;}
 </style>
 </head>
 <body>
-<h1>⚡ Leiva Timesheet Autofill</h1>
-<p class="sub">// v2 — rich text fields fixed <span style="color:#c6f135">●</span></p>
+<h1>⚡ Leiva Timesheet Autofill <span class="version-tag">v3</span></h1>
+<p class="sub">// Quill editor + flatpickr + star rating — all targeted</p>
 
 <div class="card">
   <div class="card-title">// 01 — your details</div>
@@ -74,15 +74,15 @@
 
 <div class="steps">
   <div class="card-title">// 03 — how to use</div>
-  <div class="step"><div class="snum">1</div><div class="stxt">Fill in <span style="color:#c6f135">Key Tasks</span> above — paste from <code>/weekly-summary-form</code></div></div>
+  <div class="step"><div class="snum">1</div><div class="stxt">Fill in <span style="color:#c6f135">Key Tasks</span> above</div></div>
   <div class="step"><div class="snum">2</div><div class="stxt">Click <span style="color:#c6f135">Copy Autofill Script</span> below</div></div>
   <div class="step"><div class="snum">3</div><div class="stxt">Open the <a href="https://forms.clickup.com/90161114733/f/2kz0avkd-8016/MBDB1E79JCNU9HOG36" target="_blank">Leiva Timesheet Form ↗</a></div></div>
   <div class="step"><div class="snum">4</div><div class="stxt">Click address bar → type <code>javascript:</code> → paste → Enter</div></div>
-  <div class="step"><div class="snum">5</div><div class="stxt">Review filled fields → Submit ✅</div></div>
+  <div class="step"><div class="snum">5</div><div class="stxt">Dates will pop up — pick manually. Review then Submit ✅</div></div>
 </div>
 
 <button class="copy-btn" id="copyBtn" onclick="doCopy()">⎘ Copy Autofill Script</button>
-<p class="hint">Rich text fields (Key Tasks, Challenges, Feedback) now targeted via ClickUp's contenteditable divs.</p>
+<p class="hint">v3 now correctly targets ClickUp's Quill rich text editors and emoji star rating inputs.</p>
 
 <script>
 var rating=2;
@@ -125,76 +125,80 @@ function buildScript(){
     end:week.end
   };
 
-  // Build the injected script as a string
-  var s = '(function(){';
+  var s='(function(){';
 
-  // Fill regular input fields
-  s += 'function fillInput(el,v){';
-  s += 'var p=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
-  s += 'if(p&&p.set)p.set.call(el,v);else el.value=v;';
-  s += 'el.dispatchEvent(new Event("input",{bubbles:true}));';
-  s += 'el.dispatchEvent(new Event("change",{bubbles:true}));}';
+  // --- Fill regular Angular inputs (indices 0-3) ---
+  s+='var inputs=document.querySelectorAll(".cu-form__body-item input.cu-prevent-lastpass");';
+  s+='var vals='+JSON.stringify([cfg.vaName,cfg.role,cfg.clientName,cfg.clientBusiness])+';';
+  s+='vals.forEach(function(v,i){';
+  s+='  if(!inputs[i])return;';
+  s+='  var el=inputs[i];';
+  s+='  var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
+  s+='  if(nv&&nv.set)nv.set.call(el,v);else el.value=v;';
+  s+='  el.dispatchEvent(new Event("input",{bubbles:true}));';
+  s+='  el.dispatchEvent(new Event("change",{bubbles:true}));';
+  s+='});';
 
-  // Fill ClickUp rich text / contenteditable
-  s += 'function fillRich(el,v){';
-  s += 'el.focus();';
-  s += 'document.execCommand("selectAll",false,null);';
-  s += 'document.execCommand("delete",false,null);';
-  s += 'v.split("\\n").forEach(function(line,i){';
-  s += 'if(i>0)document.execCommand("insertParagraph",false,null);';
-  s += 'document.execCommand("insertText",false,line);';
-  s += '});';
-  s += 'el.dispatchEvent(new Event("input",{bubbles:true}));}';
+  // --- Fill Quill rich text editors (ql-editor divs, indices 0=KeyTasks, 1=Challenges, 2=Feedback) ---
+  s+='var qls=document.querySelectorAll(".ql-editor");';
+  s+='var richVals='+JSON.stringify([cfg.keyTasks,cfg.blockers,cfg.feedback])+';';
+  s+='richVals.forEach(function(val,i){';
+  s+='  var ql=qls[i];';
+  s+='  if(!ql)return;';
+  s+='  ql.focus();';
+  // Clear existing content
+  s+='  ql.innerHTML="<p></p>";';
+  // Insert each line as a paragraph
+  s+='  var lines=val.split("\\n");';
+  s+='  var html=lines.map(function(l){';
+  s+='    return "<p>"+(l.trim()===""?"<br>":l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"))+"</p>";';
+  s+='  }).join("");';
+  s+='  ql.innerHTML=html;';
+  s+='  ql.dispatchEvent(new Event("input",{bubbles:true}));';
+  // Trigger Angular/Quill change detection
+  s+='  ql.dispatchEvent(new KeyboardEvent("keyup",{bubbles:true,key:"a"}));';
+  s+='});';
 
-  // Find label then its associated field (input, textarea, OR contenteditable)
-  s += 'function findField(txt){';
-  s += 'var labels=document.querySelectorAll("label,div,span,p");';
-  s += 'for(var i=0;i<labels.length;i++){';
-  s += 'var el=labels[i];';
-  s += 'if(el.children.length>4)continue;';
-  s += 'if(el.textContent.trim().toLowerCase().indexOf(txt)!==-1){';
-  // Check for associated input by for attr
-  s += 'var fid=el.htmlFor||el.getAttribute("for");';
-  s += 'if(fid){var t=document.getElementById(fid);if(t)return t;}';
-  // Walk siblings and parent to find input/textarea/contenteditable
-  s += 'var par=el.parentElement;';
-  s += 'for(var d=0;d<5;d++){';
-  s += 'if(!par)break;';
-  s += 'var inp=par.querySelector("input:not([type=hidden]),textarea,[contenteditable=true]");';
-  s += 'if(inp)return inp;';
-  s += 'par=par.parentElement;}';
-  s += '}}return null;}';
+  // --- Date pickers — open flatpickr and set value ---
+  // flatpickr attaches to numInput.cur-year siblings; easier to click and use flatpickr API
+  s+='setTimeout(function(){';
+  s+='  var fps=document.querySelectorAll(".flatpickr-input,.numInput.cur-year");';
+  // Try setting via flatpickr instance on the wrapper
+  s+='  var fpWrappers=document.querySelectorAll(".cu-form__body-item-half-width");';
+  s+='  var dateVals='+JSON.stringify([cfg.start,cfg.end])+';';
+  s+='  fpWrappers.forEach(function(w,i){';
+  s+='    if(i>1)return;';
+  s+='    var inp=w.querySelector("input");';
+  s+='    if(inp&&inp._flatpickr){inp._flatpickr.setDate(dateVals[i],true);}';
+  s+='    else if(inp){';
+  s+='      var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
+  s+='      if(nv&&nv.set)nv.set.call(inp,dateVals[i]);';
+  s+='      inp.dispatchEvent(new Event("input",{bubbles:true}));';
+  s+='      inp.dispatchEvent(new Event("change",{bubbles:true}));';
+  s+='    }';
+  s+='  });';
+  s+='},300);';
 
-  // Fill standard text inputs by label
-  var textFields = [
-    ['va name', cfg.vaName],
-    ['role', cfg.role],
-    ['client name', cfg.clientName],
-    ['client business', cfg.clientBusiness],
-  ];
-  textFields.forEach(function(f){
-    s += 'var _f=findField('+JSON.stringify(f[0])+');if(_f&&_f.tagName!=="DIV")fillInput(_f,'+JSON.stringify(f[1])+');';
-  });
+  // --- Star rating — cu-emoji-custom-field-value__input hidden inputs ---
+  // These are hidden radio-like inputs; click the nth label/star SVG instead
+  s+='setTimeout(function(){';
+  s+='  var starItems=document.querySelectorAll(".cu-emoji-custom-field-value__item");';
+  s+='  if(starItems.length>='+ cfg.rating +'){';
+  s+='    starItems['+(cfg.rating-1)+'].click();';
+  s+='    starItems['+(cfg.rating-1)+'].dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));';
+  s+='  } else {';
+  // fallback: try inputs directly
+  s+='    var starInputs=document.querySelectorAll(".cu-emoji-custom-field-value__input");';
+  s+='    if(starInputs.length>='+ cfg.rating +'){';
+  s+='      var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
+  s+='      if(nv&&nv.set)nv.set.call(starInputs['+(cfg.rating-1)+'],"'+cfg.rating+'");';
+  s+='      starInputs['+(cfg.rating-1)+'].dispatchEvent(new Event("change",{bubbles:true}));';
+  s+='    }';
+  s+='  }';
+  s+='},500);';
 
-  // Fill rich text fields — target contenteditable divs inside ClickUp form sections
-  // Strategy: find all contenteditable divs, map them in order (Key Tasks=0, Challenges=1, Feedback=2)
-  s += 'var richEls=Array.from(document.querySelectorAll("[contenteditable=true]"));';
-  s += 'var richValues='+JSON.stringify([cfg.keyTasks, cfg.blockers, cfg.feedback])+';';
-  s += 'richValues.forEach(function(val,i){if(richEls[i])fillRich(richEls[i],val);});';
-
-  // Date pickers — ClickUp uses custom dropdowns, try clicking and selecting
-  s += 'var dateDrops=document.querySelectorAll("[data-test*=date],[class*=date-picker],[class*=DatePicker]");';
-  s += 'var plainDates=document.querySelectorAll("input[type=date]");';
-  s += 'if(plainDates.length>=2){fillInput(plainDates[0],'+JSON.stringify(cfg.start)+');fillInput(plainDates[1],'+JSON.stringify(cfg.end)+');}';
-
-  // Star rating
-  s += 'setTimeout(function(){';
-  s += 'var stars=document.querySelectorAll("[class*=star] svg,[class*=star] span,[class*=rating] svg,[class*=rating] span,svg[class*=star]");';
-  s += 'if(stars.length>='+cfg.rating+')stars['+(cfg.rating-1)+'].dispatchEvent(new MouseEvent("click",{bubbles:true}));';
-  s += '},800);';
-
-  s += 'alert("\\u26a1 Done! Key Tasks, Challenges & Feedback filled. Check dates & stars manually if needed, then Submit.");';
-  s += '})();';
+  s+='alert("\\u26a1 v3 done! Check dates (set manually if needed) then Submit.");';
+  s+='})();';
 
   return s;
 }
@@ -203,18 +207,19 @@ function doCopy(){
   var script=buildScript();
   var full='javascript:'+encodeURIComponent(script);
   navigator.clipboard.writeText(full).then(function(){
-    var btn=document.getElementById('copyBtn');
-    btn.textContent='✓ Copied!';
-    btn.classList.add('done');
-    setTimeout(function(){btn.textContent='⎘ Copy Autofill Script';btn.classList.remove('done');},2500);
+    showDone();
   }).catch(function(){
     var ta=document.createElement('textarea');
     ta.value=full;document.body.appendChild(ta);ta.select();
     document.execCommand('copy');document.body.removeChild(ta);
-    var btn=document.getElementById('copyBtn');
-    btn.textContent='✓ Copied!';btn.classList.add('done');
-    setTimeout(function(){btn.textContent='⎘ Copy Autofill Script';btn.classList.remove('done');},2500);
+    showDone();
   });
+}
+
+function showDone(){
+  var btn=document.getElementById('copyBtn');
+  btn.textContent='✓ Copied!';btn.classList.add('done');
+  setTimeout(function(){btn.textContent='⎘ Copy Autofill Script';btn.classList.remove('done');},2500);
 }
 </script>
 </body>
