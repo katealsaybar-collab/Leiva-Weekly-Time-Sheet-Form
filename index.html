@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leiva Timesheet — Bookmarklet Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;1,300&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --accent: #c8f564;
+    --accent2: #64d5f5;
+    --text: #e8e8e8;
+    --muted: #666;
+    --success: #4ade80;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 48px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .header h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-size: 2.2rem;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .header p {
+    color: var(--muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    width: 100%;
+    max-width: 640px;
+    margin-bottom: 24px;
+  }
+
+  .card-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 20px;
+  }
+
+  .field-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  input, select, textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    padding: 10px 14px;
+    width: 100%;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.6;
+  }
+
+  .tasks-area {
+    min-height: 200px;
+  }
+
+  .hint {
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .hint span {
+    color: var(--accent);
+  }
+
+  .stars-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  .star-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.4rem;
+    color: var(--border);
+    transition: color 0.1s, transform 0.1s;
+    padding: 2px;
+  }
+
+  .star-btn.active { color: #f5c842; }
+  .star-btn:hover { transform: scale(1.2); }
+
+  .star-label {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-left: 8px;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+
+  /* Bookmarklet drag zone */
+  .bookmarklet-zone {
+    background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+    border: 1px dashed var(--accent);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+    width: 100%;
+    max-width: 640px;
+    margin-bottom: 24px;
+  }
+
+  .bookmarklet-zone p {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+
+  .bookmarklet-link {
+    display: inline-block;
+    background: var(--accent);
+    color: #0f0f0f;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 12px 28px;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+
+  .bookmarklet-link:active { cursor: grabbing; }
+  .bookmarklet-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(200, 245, 100, 0.25);
+  }
+
+  .drag-hint {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 12px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Action buttons */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0f0f0f;
+    font-weight: 500;
+  }
+
+  .btn-primary:hover {
+    background: #d9ff7a;
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .status-msg {
+    font-size: 0.72rem;
+    color: var(--success);
+    text-align: center;
+    margin-top: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    min-height: 20px;
+  }
+
+  .status-msg.show { opacity: 1; }
+
+  /* Week display */
+  .week-display {
+    display: flex;
+    gap: 12px;
+  }
+
+  .week-display input { flex: 1; }
+
+  .week-auto-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(100, 213, 245, 0.1);
+    border: 1px solid rgba(100, 213, 245, 0.3);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.65rem;
+    color: var(--accent2);
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+
+  .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Leiva Timesheet Autofill</h1>
+  <p>// configure → generate bookmarklet → drag to bookmarks bar</p>
+</div>
+
+<!-- Static Fields Card -->
+<div class="card">
+  <div class="card-title">// 01 — your details</div>
+
+  <div class="field-row">
+    <label>VA Name</label>
+    <input type="text" id="vaName" value="Kate Alsaybar">
+  </div>
+
+  <div class="field-row">
+    <label>Role / Position</label>
+    <input type="text" id="role" value="Operations & Performance Manager, EA">
+  </div>
+
+  <div class="field-row">
+    <label>Client Name</label>
+    <input type="text" id="clientName" value="Tara Rose Kidd">
+  </div>
+
+  <div class="field-row">
+    <label>Client Business</label>
+    <input type="text" id="clientBusiness" value="Tara Rose Ladies Salon">
+  </div>
+</div>
+
+<!-- Week + Tasks Card -->
+<div class="card">
+  <div class="card-title">// 02 — this week's data</div>
+
+  <div class="week-auto-badge">
+    <div class="dot"></div>
+    auto-computed from today's date
+  </div>
+
+  <div class="field-row">
+    <label>Week Range</label>
+    <div class="week-display">
+      <input type="text" id="weekStart" readonly placeholder="Mon Jun 02, 2026">
+      <input type="text" id="weekEnd" readonly placeholder="Fri Jun 06, 2026">
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="field-row">
+    <label>Key Tasks Completed</label>
+    <textarea id="keyTasks" class="tasks-area" placeholder="Paste your /weekly-summary-form output here..."></textarea>
+    <p class="hint">Paste the output from <span>/weekly-summary-form</span> above ↑</p>
+  </div>
+
+  <div class="field-row">
+    <label>Challenges or Blockers</label>
+    <input type="text" id="blockers" value="N/A">
+  </div>
+
+  <div class="field-row">
+    <label>Client Feedback or Notes</label>
+    <input type="text" id="feedback" value="N/A">
+  </div>
+
+  <div class="field-row">
+    <label>Rate Your Week (1–5)</label>
+    <div class="stars-row">
+      <button class="star-btn" data-val="1" onclick="setRating(1)">★</button>
+      <button class="star-btn" data-val="2" onclick="setRating(2)">★</button>
+      <button class="star-btn" data-val="3" onclick="setRating(3)">★</button>
+      <button class="star-btn" data-val="4" onclick="setRating(4)">★</button>
+      <button class="star-btn" data-val="5" onclick="setRating(5)">★</button>
+      <span class="star-label" id="starLabel">2 — Tough week</span>
+    </div>
+    <input type="hidden" id="rating" value="2">
+  </div>
+</div>
+
+<!-- Bookmarklet Zone -->
+<div class="bookmarklet-zone">
+  <p>Drag the button below to your bookmarks bar.<br>
+  Then go to the form, fill in your Key Tasks above, and click the bookmark.</p>
+  <a id="bookmarklet-link" class="bookmarklet-link" href="#">⚡ Fill Leiva Timesheet</a>
+  <div class="drag-hint">↑ drag this to your bookmarks bar</div>
+</div>
+
+<!-- Actions -->
+<div class="card">
+  <div class="card-title">// 03 — actions</div>
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="generateBookmarklet()">↻ Regenerate Bookmarklet</button>
+    <button class="btn btn-secondary" onclick="copyScript()">⎘ Copy Script</button>
+  </div>
+  <div class="status-msg" id="statusMsg"></div>
+</div>
+
+<script>
+  let currentRating = 2;
+
+  const starLabels = {
+    1: '1 — Tough week',
+    2: '2 — Below average',
+    3: '3 — Okay week',
+    4: '4 — Good week',
+    5: '5 — Excellent week'
+  };
+
+  function setRating(val) {
+    currentRating = val;
+    document.getElementById('rating').value = val;
+    document.getElementById('starLabel').textContent = starLabels[val];
+    document.querySelectorAll('.star-btn').forEach(btn => {
+      btn.classList.toggle('active', parseInt(btn.dataset.val) <= val);
+    });
+    generateBookmarklet();
+  }
+
+  function getMonday(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = (day === 0 ? -6 : 1 - day);
+    date.setDate(date.getDate() + diff);
+    return date;
+  }
+
+  function formatDate(d) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+  }
+
+  function computeWeekDates() {
+    const now = new Date();
+    const mon = getMonday(now);
+    const fri = new Date(mon);
+    fri.setDate(mon.getDate() + 4);
+
+    document.getElementById('weekStart').value = formatDate(mon);
+    document.getElementById('weekEnd').value = formatDate(fri);
+
+    return {
+      start: mon.toISOString().split('T')[0],
+      end: fri.toISOString().split('T')[0]
+    };
+  }
+
+  function generateBookmarklet() {
+    const dates = computeWeekDates();
+
+    const config = {
+      vaName: document.getElementById('vaName').value,
+      role: document.getElementById('role').value,
+      clientName: document.getElementById('clientName').value,
+      clientBusiness: document.getElementById('clientBusiness').value,
+      weekStart: dates.start,
+      weekEnd: dates.end,
+      keyTasks: document.getElementById('keyTasks').value,
+      blockers: document.getElementById('blockers').value,
+      feedback: document.getElementById('feedback').value,
+      rating: parseInt(document.getElementById('rating').value)
+    };
+
+    const script = generateScript(config);
+    const encoded = encodeURIComponent(script);
+    const link = document.getElementById('bookmarklet-link');
+    link.href = 'javascript:' + encoded;
+  }
+
+  function generateScript(c) {
+    return `(function(){
+  function fillText(el, val){
+    var nativeInput=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value')||
+      Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value');
+    if(nativeInput&&nativeInput.set){nativeInput.set.call(el,val);}else{el.value=val;}
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  function fillDatePicker(label,dateStr){
+    var els=document.querySelectorAll('[data-id],[id],[name]');
+    var allInputs=document.querySelectorAll('input,select,textarea');
+    var labels=document.querySelectorAll('label,div,span');
+    labels.forEach(function(l){
+      if(l.textContent.trim().toLowerCase().includes(label.toLowerCase())){
+        var inp=l.parentElement?l.parentElement.querySelector('input'):null;
+        if(inp){try{fillText(inp,dateStr);}catch(e){}}
+      }
+    });
+  }
+  function clickNthStar(n){
+    var stars=document.querySelectorAll('[class*="star"],[class*="rating"] span,[class*="rating"] svg,[data-rating]');
+    if(stars.length>=n){stars[n-1].click();}
+  }
+
+  var allInputs=Array.from(document.querySelectorAll('input:not([type=hidden]),textarea'));
+  var allLabels=Array.from(document.querySelectorAll('label,div[class*="label"],span[class*="label"]'));
+
+  function findFieldByLabel(searchText){
+    for(var i=0;i<allLabels.length;i++){
+      var lbl=allLabels[i];
+      if(lbl.textContent.trim().toLowerCase().includes(searchText.toLowerCase())){
+        var inp=null;
+        var forId=lbl.htmlFor||lbl.getAttribute('for');
+        if(forId)inp=document.getElementById(forId);
+        if(!inp)inp=lbl.nextElementSibling;
+        if(!inp&&lbl.parentElement)inp=lbl.parentElement.querySelector('input,textarea');
+        if(inp)return inp;
+        var next=lbl;
+        while(next=next.nextElementSibling){
+          var found=next.querySelector?next.querySelector('input,textarea'):null;
+          if(found)return found;
+          if(next.tagName==='INPUT'||next.tagName==='TEXTAREA')return next;
+        }
+      }
+    }
+    return null;
+  }
+
+  var fields=[
+    {label:'va name',value:${JSON.stringify(c.vaName)}},
+    {label:'role',value:${JSON.stringify(c.role)}},
+    {label:'client name',value:${JSON.stringify(c.clientName)}},
+    {label:'client business',value:${JSON.stringify(c.clientBusiness)}},
+    {label:'key tasks',value:${JSON.stringify(c.keyTasks)}},
+    {label:'challenges',value:${JSON.stringify(c.blockers)}},
+    {label:'client feedback',value:${JSON.stringify(c.feedback)}},
+  ];
+
+  fields.forEach(function(f){
+    var el=findFieldByLabel(f.label);
+    if(el){fillText(el,f.value);}
+  });
+
+  /* Date pickers — try multiple strategies */
+  var dateInputs=document.querySelectorAll('input[type="date"],input[placeholder*="date" i],input[placeholder*="Date"]');
+  if(dateInputs.length>=2){
+    fillText(dateInputs[0],${JSON.stringify(c.weekStart)});
+    fillText(dateInputs[1],${JSON.stringify(c.weekEnd)});
+  }
+
+  /* Star rating — click nth star */
+  setTimeout(function(){
+    var ratingContainers=document.querySelectorAll('[class*="star"],[class*="rating"],[class*="Rate"]');
+    var stars=[];
+    ratingContainers.forEach(function(rc){
+      var svgs=rc.querySelectorAll('svg,span,button,i');
+      svgs.forEach(function(s){stars.push(s);});
+    });
+    if(stars.length>=${JSON.stringify(c.rating)}){
+      stars[${JSON.stringify(c.rating)}-1].click();
+    }
+    var allStarSvg=document.querySelectorAll('svg[class*="star"],path[class*="star"]');
+    if(allStarSvg.length>=${JSON.stringify(c.rating)}){
+      allStarSvg[${JSON.stringify(c.rating)}-1].dispatchEvent(new MouseEvent('click',{bubbles:true}));
+    }
+  },500);
+
+  alert('\\u26a1 Leiva Timesheet filled!\\nReview fields then click Submit.');
+})();`;
+  }
+
+  function copyScript() {
+    const config = {
+      vaName: document.getElementById('vaName').value,
+      role: document.getElementById('role').value,
+      clientName: document.getElementById('clientName').value,
+      clientBusiness: document.getElementById('clientBusiness').value,
+      weekStart: computeWeekDates().start,
+      weekEnd: computeWeekDates().end,
+      keyTasks: document.getElementById('keyTasks').value,
+      blockers: document.getElementById('blockers').value,
+      feedback: document.getElementById('feedback').value,
+      rating: parseInt(document.getElementById('rating').value)
+    };
+    navigator.clipboard.writeText('javascript:' + encodeURIComponent(generateScript(config)));
+    showStatus('Copied to clipboard!');
+  }
+
+  function showStatus(msg) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  // Init
+  setRating(2);
+  generateBookmarklet();
+
+  // Auto-regenerate on any input change
+  document.querySelectorAll('input,textarea').forEach(el => {
+    el.addEventListener('input', generateBookmarklet);
+  });
+</script>
+</body>
+</html>
