@@ -33,12 +33,12 @@
   .copy-btn:hover{background:#d4ff45;}
   .copy-btn.done{background:#4ade80;}
   .hint{font-size:0.62rem;color:#3a3a3a;text-align:center;max-width:560px;line-height:1.6;}
-  .version-tag{display:inline-block;background:#c6f135;color:#0c0c0c;font-size:0.55rem;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;vertical-align:middle;}
+  .vtag{display:inline-block;background:#c6f135;color:#0c0c0c;font-size:0.55rem;font-weight:700;padding:2px 7px;border-radius:3px;margin-left:8px;vertical-align:middle;}
 </style>
 </head>
 <body>
-<h1>⚡ Leiva Timesheet Autofill <span class="version-tag">v3</span></h1>
-<p class="sub">// Quill editor + flatpickr + star rating — all targeted</p>
+<h1>⚡ Leiva Timesheet <span class="vtag">v4 FINAL</span></h1>
+<p class="sub">// indexes confirmed via DevTools — this should work na talaga</p>
 
 <div class="card">
   <div class="card-title">// 01 — your details</div>
@@ -74,15 +74,15 @@
 
 <div class="steps">
   <div class="card-title">// 03 — how to use</div>
-  <div class="step"><div class="snum">1</div><div class="stxt">Fill in <span style="color:#c6f135">Key Tasks</span> above</div></div>
-  <div class="step"><div class="snum">2</div><div class="stxt">Click <span style="color:#c6f135">Copy Autofill Script</span> below</div></div>
-  <div class="step"><div class="snum">3</div><div class="stxt">Open the <a href="https://forms.clickup.com/90161114733/f/2kz0avkd-8016/MBDB1E79JCNU9HOG36" target="_blank">Leiva Timesheet Form ↗</a></div></div>
-  <div class="step"><div class="snum">4</div><div class="stxt">Click address bar → type <code>javascript:</code> → paste → Enter</div></div>
-  <div class="step"><div class="snum">5</div><div class="stxt">Dates will pop up — pick manually. Review then Submit ✅</div></div>
+  <div class="step"><div class="snum">1</div><div class="stxt">Paste Key Tasks above</div></div>
+  <div class="step"><div class="snum">2</div><div class="stxt">Click <span style="color:#c6f135">Copy Autofill Script</span></div></div>
+  <div class="step"><div class="snum">3</div><div class="stxt">Open <a href="https://forms.clickup.com/90161114733/f/2kz0avkd-8016/MBDB1E79JCNU9HOG36" target="_blank">Leiva Timesheet Form ↗</a></div></div>
+  <div class="step"><div class="snum">4</div><div class="stxt">Address bar → type <code>javascript:</code> → paste → Enter</div></div>
+  <div class="step"><div class="snum">5</div><div class="stxt">Set dates manually → Submit ✅</div></div>
 </div>
 
 <button class="copy-btn" id="copyBtn" onclick="doCopy()">⎘ Copy Autofill Script</button>
-<p class="hint">v3 now correctly targets ClickUp's Quill rich text editors and emoji star rating inputs.</p>
+<p class="hint">Dates only need manual input. Everything else auto-fills.</p>
 
 <script>
 var rating=2;
@@ -92,20 +92,15 @@ function setRating(n){
   rating=n;
   document.getElementById('rating').value=n;
   document.getElementById('starLbl').textContent=labels[n];
-  document.querySelectorAll('.star').forEach(function(s){
-    s.classList.toggle('on',parseInt(s.dataset.v)<=n);
-  });
+  document.querySelectorAll('.star').forEach(function(s){s.classList.toggle('on',parseInt(s.dataset.v)<=n);});
 }
 
 function getWeek(){
-  var now=new Date();
-  var d=now.getDay();
-  var diff=d===0?-6:1-d;
+  var now=new Date();var d=now.getDay();var diff=d===0?-6:1-d;
   var mon=new Date(now);mon.setDate(now.getDate()+diff);
   var fri=new Date(mon);fri.setDate(mon.getDate()+4);
   var fmt=function(dt){return dt.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});};
-  var iso=function(dt){return dt.toISOString().split('T')[0];};
-  return{display:fmt(mon)+' \u2192 '+fmt(fri),start:iso(mon),end:iso(fri)};
+  return{display:fmt(mon)+' \u2192 '+fmt(fri)};
 }
 
 var week=getWeek();
@@ -120,102 +115,70 @@ function buildScript(){
     keyTasks:document.getElementById('keyTasks').value,
     blockers:document.getElementById('blockers').value,
     feedback:document.getElementById('feedback').value,
-    rating:rating,
-    start:week.start,
-    end:week.end
+    rating:rating
   };
 
   var s='(function(){';
 
-  // --- Fill regular Angular inputs (indices 0-3) ---
-  s+='var inputs=document.querySelectorAll(".cu-form__body-item input.cu-prevent-lastpass");';
-  s+='var vals='+JSON.stringify([cfg.vaName,cfg.role,cfg.clientName,cfg.clientBusiness])+';';
-  s+='vals.forEach(function(v,i){';
-  s+='  if(!inputs[i])return;';
-  s+='  var el=inputs[i];';
-  s+='  var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
-  s+='  if(nv&&nv.set)nv.set.call(el,v);else el.value=v;';
-  s+='  el.dispatchEvent(new Event("input",{bubbles:true}));';
-  s+='  el.dispatchEvent(new Event("change",{bubbles:true}));';
-  s+='});';
+  // Helper: fill Angular input
+  s+='function fi(el,v){';
+  s+='var d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
+  s+='if(d&&d.set)d.set.call(el,v);else el.value=v;';
+  s+='el.dispatchEvent(new Event("input",{bubbles:true}));';
+  s+='el.dispatchEvent(new Event("change",{bubbles:true}));}';
 
-  // --- Fill Quill rich text editors (ql-editor divs, indices 0=KeyTasks, 1=Challenges, 2=Feedback) ---
+  // Helper: fill Quill editor
+  s+='function fq(el,v){';
+  s+='el.focus();';
+  s+='var lines=v.split("\\n");';
+  s+='var html=lines.map(function(l){return "<p>"+(l===""?"<br>":l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"))+"</p>";}).join("");';
+  s+='el.innerHTML=html;';
+  s+='el.dispatchEvent(new Event("input",{bubbles:true}));';
+  s+='el.dispatchEvent(new KeyboardEvent("keyup",{bubbles:true}));}';
+
+  // CONFIRMED indexes from DevTools:
+  // cu-prevent-lastpass inputs: 0=VA Name, 1=Role, 2=Client Name, 3=Client Business
+  // Stars hidden inputs: 7='1', 8='2', 9='3', 10='4', 11='5'
+  s+='var inp=document.querySelectorAll("input.cu-prevent-lastpass");';
+  s+='var textVals='+JSON.stringify([cfg.vaName,cfg.role,cfg.clientName,cfg.clientBusiness])+';';
+  s+='for(var i=0;i<4;i++){if(inp[i])fi(inp[i],textVals[i]);}';
+
+  // CONFIRMED ql-editor indexes:
+  // 0=form description (skip!), 1=Key Tasks, 2=Challenges, 3=Feedback
   s+='var qls=document.querySelectorAll(".ql-editor");';
-  s+='var richVals='+JSON.stringify([cfg.keyTasks,cfg.blockers,cfg.feedback])+';';
-  s+='richVals.forEach(function(val,i){';
-  s+='  var ql=qls[i];';
-  s+='  if(!ql)return;';
-  s+='  ql.focus();';
-  // Clear existing content
-  s+='  ql.innerHTML="<p></p>";';
-  // Insert each line as a paragraph
-  s+='  var lines=val.split("\\n");';
-  s+='  var html=lines.map(function(l){';
-  s+='    return "<p>"+(l.trim()===""?"<br>":l.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"))+"</p>";';
-  s+='  }).join("");';
-  s+='  ql.innerHTML=html;';
-  s+='  ql.dispatchEvent(new Event("input",{bubbles:true}));';
-  // Trigger Angular/Quill change detection
-  s+='  ql.dispatchEvent(new KeyboardEvent("keyup",{bubbles:true,key:"a"}));';
-  s+='});';
+  s+='if(qls[1])fq(qls[1],'+JSON.stringify(cfg.keyTasks)+');';
+  s+='if(qls[2])fq(qls[2],'+JSON.stringify(cfg.blockers)+');';
+  s+='if(qls[3])fq(qls[3],'+JSON.stringify(cfg.feedback)+');';
 
-  // --- Date pickers — open flatpickr and set value ---
-  // flatpickr attaches to numInput.cur-year siblings; easier to click and use flatpickr API
+  // CONFIRMED star rating: hidden inputs at index 7-11 (values '1'-'5')
+  // Click the label/wrapper for the correct star
+  // Stars inputs are at inp[7] through inp[11], click inp[6+rating]
   s+='setTimeout(function(){';
-  s+='  var fps=document.querySelectorAll(".flatpickr-input,.numInput.cur-year");';
-  // Try setting via flatpickr instance on the wrapper
-  s+='  var fpWrappers=document.querySelectorAll(".cu-form__body-item-half-width");';
-  s+='  var dateVals='+JSON.stringify([cfg.start,cfg.end])+';';
-  s+='  fpWrappers.forEach(function(w,i){';
-  s+='    if(i>1)return;';
-  s+='    var inp=w.querySelector("input");';
-  s+='    if(inp&&inp._flatpickr){inp._flatpickr.setDate(dateVals[i],true);}';
-  s+='    else if(inp){';
-  s+='      var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
-  s+='      if(nv&&nv.set)nv.set.call(inp,dateVals[i]);';
-  s+='      inp.dispatchEvent(new Event("input",{bubbles:true}));';
-  s+='      inp.dispatchEvent(new Event("change",{bubbles:true}));';
-  s+='    }';
-  s+='  });';
-  s+='},300);';
+  s+='var starInp=document.querySelectorAll("input.cu-prevent-lastpass");';
+  s+='var starIdx=6+'+cfg.rating+';';
+  s+='if(starInp[starIdx]){';
+  s+='  var lbl=starInp[starIdx].closest("label")||starInp[starIdx].parentElement;';
+  s+='  if(lbl)lbl.click();';
+  s+='  starInp[starIdx].dispatchEvent(new MouseEvent("click",{bubbles:true}));';
+  s+='}';
+  // Also try cu-emoji-custom-field-value__item
+  s+='var items=document.querySelectorAll(".cu-emoji-custom-field-value__item,.cu-emoji-custom-field-value__item-wrapper");';
+  s+='if(items['+(cfg.rating-1)+'])items['+(cfg.rating-1)+'].click();';
+  s+='},400);';
 
-  // --- Star rating — cu-emoji-custom-field-value__input hidden inputs ---
-  // These are hidden radio-like inputs; click the nth label/star SVG instead
-  s+='setTimeout(function(){';
-  s+='  var starItems=document.querySelectorAll(".cu-emoji-custom-field-value__item");';
-  s+='  if(starItems.length>='+ cfg.rating +'){';
-  s+='    starItems['+(cfg.rating-1)+'].click();';
-  s+='    starItems['+(cfg.rating-1)+'].dispatchEvent(new MouseEvent("mousedown",{bubbles:true}));';
-  s+='  } else {';
-  // fallback: try inputs directly
-  s+='    var starInputs=document.querySelectorAll(".cu-emoji-custom-field-value__input");';
-  s+='    if(starInputs.length>='+ cfg.rating +'){';
-  s+='      var nv=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value");';
-  s+='      if(nv&&nv.set)nv.set.call(starInputs['+(cfg.rating-1)+'],"'+cfg.rating+'");';
-  s+='      starInputs['+(cfg.rating-1)+'].dispatchEvent(new Event("change",{bubbles:true}));';
-  s+='    }';
-  s+='  }';
-  s+='},500);';
-
-  s+='alert("\\u26a1 v3 done! Check dates (set manually if needed) then Submit.");';
+  s+='alert("\\u26a1 Done! Set the dates manually then Submit.");';
   s+='})();';
-
   return s;
 }
 
 function doCopy(){
-  var script=buildScript();
-  var full='javascript:'+encodeURIComponent(script);
-  navigator.clipboard.writeText(full).then(function(){
-    showDone();
-  }).catch(function(){
-    var ta=document.createElement('textarea');
-    ta.value=full;document.body.appendChild(ta);ta.select();
-    document.execCommand('copy');document.body.removeChild(ta);
+  var full='javascript:'+encodeURIComponent(buildScript());
+  navigator.clipboard.writeText(full).then(showDone).catch(function(){
+    var ta=document.createElement('textarea');ta.value=full;
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
     showDone();
   });
 }
-
 function showDone(){
   var btn=document.getElementById('copyBtn');
   btn.textContent='✓ Copied!';btn.classList.add('done');
